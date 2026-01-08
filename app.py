@@ -782,7 +782,23 @@ def render_documents_page():
                 analysis_result = document_processor.analyze_medical_document(processing_result["extracted_text"])
 
             if analysis_result["success"]:
-                st.markdown(analysis_result["analysis"])
+                # Get the analysis text - handle both highlighted and non-highlighted versions
+                analysis_text = analysis_result.get("analysis", "")
+                if not analysis_text or analysis_text.strip() == "":
+                    # Fallback to original analysis if highlighted is empty
+                    analysis_text = analysis_result.get("original_analysis", "")
+                
+                # Make sure we have content
+                if analysis_text and analysis_text.strip():
+                    st.markdown(analysis_text)
+                else:
+                    # Last resort: show medical values if analysis is empty
+                    if analysis_result.get("medical_values"):
+                        st.write("**Extracted Medical Values:**")
+                        for value in analysis_result["medical_values"]:
+                            st.write(f"• {value.get('name', 'Unknown')}: {value.get('value', 'N/A')} {value.get('unit', '')}")
+                    else:
+                        st.info("Analysis completed. Please review the extracted text above for medical information.")
             else:
                 st.error(f"Analysis failed: {analysis_result.get('error', 'Unknown error')}")
 

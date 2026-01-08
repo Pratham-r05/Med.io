@@ -10,6 +10,7 @@ import cv2
 import pytesseract
 import numpy as np
 import re
+import time
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 from PIL import Image
@@ -405,7 +406,7 @@ Base your entire analysis on the actual content extracted from this document. Qu
                 "stream": False,
                 "options": {
                     "temperature": config.OCR_TEMPERATURE,  # 0.2 - precise document analysis
-                    "num_predict": 400,      # Concise document analysis (20% reduction)
+                    "num_predict": config.DEFAULT_MAX_TOKENS,  # Full response - complete analysis
                     "top_p": config.TOP_P,   # Good diversity
                     "top_k": config.TOP_K,   # Balanced selection
                     "repeat_penalty": config.REPEAT_PENALTY,  # Prevent repetition

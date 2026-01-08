@@ -287,7 +287,7 @@ USER REQUEST: {user_query if user_query else "Analyze this medical image for con
                 "stream": False,
                 "options": {
                     "temperature": config.VISION_TEMPERATURE,  # 0.2 - precise vision analysis
-                    "num_predict": 320,   # Concise vision analysis (20% reduction)
+                    "num_predict": config.DEFAULT_MAX_TOKENS,  # Full response - use complete max tokens
                     "top_p": config.TOP_P,        # Good diversity
                     "top_k": config.TOP_K,          # Balanced selection
                     "repeat_penalty": config.REPEAT_PENALTY,  # Prevent repetition

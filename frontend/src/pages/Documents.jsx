@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import axios from 'axios';
 import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -61,25 +64,34 @@ export default function Documents() {
     else if (result.analysis.original_analysis) text = result.analysis.original_analysis;
     
     if (text) {
-      const formatted = text.split('\n').map((line, i) => {
-        if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold mt-4 mb-2 text-slate-100">{line.replace('## ', '')}</h2>;
-        if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mt-5 mb-3 text-slate-100">{line.replace('# ', '')}</h1>;
-        if (line.startsWith('- ')) return <li key={i} className="ml-4 list-disc text-slate-300">{line.replace('- ', '')}</li>;
-        if (line.trim() === '') return <br key={i} />;
-        
-        const parts = line.split(/(\*\*.*?\*\*)/g);
-        return (
-          <p key={i} className="mb-2 text-slate-300">
-            {parts.map((part, j) => {
-              if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={j} className="text-slate-100">{part.slice(2, -2)}</strong>;
-              }
-              return part;
-            })}
-          </p>
-        );
-      });
-      return <div className="space-y-1">{formatted}</div>;
+      return (
+        <div className="prose prose-invert max-w-none">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              table: ({node, ...props}) => <div className="overflow-x-auto my-4 rounded-lg border border-slate-600"><table className="w-full text-sm text-left border-collapse" {...props} /></div>,
+              thead: ({node, ...props}) => <thead className="bg-slate-800/80" {...props} />,
+              th: ({node, ...props}) => <th className="px-4 py-2.5 font-semibold border-b border-slate-600 text-blue-300 text-xs uppercase tracking-wider" {...props} />,
+              td: ({node, ...props}) => <td className="px-4 py-2 border-b border-slate-600/50 align-top" {...props} />,
+              tr: ({node, ...props}) => <tr className="even:bg-slate-800/30 hover:bg-slate-600/20 transition-colors" {...props} />,
+              h1: ({node, ...props}) => <h1 className="text-2xl font-bold mt-5 mb-3 text-slate-100" {...props} />,
+              h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-5 mb-2 text-slate-100 border-b border-slate-600/50 pb-1" {...props} />,
+              h3: ({node, ...props}) => <h3 className="text-base font-semibold mt-4 mb-1.5 text-slate-200" {...props} />,
+              p: ({node, ...props}) => <p className="mb-2 last:mb-0 text-slate-300 leading-relaxed" {...props} />,
+              ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1 text-slate-300" {...props} />,
+              ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2 space-y-1 text-slate-300" {...props} />,
+              li: ({node, ...props}) => <li className="mb-1 leading-relaxed" {...props} />,
+              strong: ({node, ...props}) => <strong className="text-slate-100 font-semibold" {...props} />,
+              a: ({node, ...props}) => <a className="text-blue-400 hover:underline" {...props} />,
+              hr: ({node, ...props}) => <hr className="border-slate-600/50 my-3" {...props} />,
+              code: ({node, inline, ...props}) => inline ? <code className="bg-slate-800 px-1 rounded text-blue-300" {...props} /> : <pre className="bg-slate-800 p-2 rounded overflow-x-auto mb-2"><code {...props} /></pre>
+            }}
+          >
+            {text}
+          </ReactMarkdown>
+        </div>
+      );
     }
     
     if (result.analysis.medical_values?.length > 0) {

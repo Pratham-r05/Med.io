@@ -110,10 +110,10 @@ export default function Chat() {
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div 
-                className={`max-w-[60%] ${
+                className={`${
                   msg.role === 'user' 
-                    ? 'whitespace-pre-wrap bg-blue-600 text-white rounded-2xl px-4 py-2 rounded-tr-sm' 
-                    : 'bg-slate-700 text-slate-100 rounded-2xl px-4 py-2 rounded-tl-sm prose prose-invert max-w-none'
+                    ? 'max-w-[60%] whitespace-pre-wrap bg-blue-600 text-white rounded-2xl px-4 py-2 rounded-tr-sm' 
+                    : 'max-w-[85%] bg-slate-700 text-slate-100 rounded-2xl px-5 py-4 rounded-tl-sm prose prose-invert max-w-none'
                 }`}
               >
                 {msg.role === 'user' ? (
@@ -123,14 +123,20 @@ export default function Chat() {
                     remarkPlugins={[remarkGfm]}
                     rehypePlugins={[rehypeRaw]}
                     components={{
-                      table: ({node, ...props}) => <div className="overflow-x-auto my-4"><table className="w-full text-sm text-left border-collapse border border-slate-600" {...props} /></div>,
-                      th: ({node, ...props}) => <th className="px-4 py-2 bg-slate-800 font-semibold border border-slate-600" {...props} />,
-                      td: ({node, ...props}) => <td className="px-4 py-2 border border-slate-600 align-top" {...props} />,
-                      p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                      ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2" {...props} />,
-                      ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2" {...props} />,
-                      li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                      table: ({node, ...props}) => <div className="overflow-x-auto my-4 rounded-lg border border-slate-600"><table className="w-full text-sm text-left border-collapse" {...props} /></div>,
+                      thead: ({node, ...props}) => <thead className="bg-slate-800/80" {...props} />,
+                      th: ({node, ...props}) => <th className="px-4 py-2.5 font-semibold border-b border-slate-600 text-blue-300 text-xs uppercase tracking-wider" {...props} />,
+                      td: ({node, ...props}) => <td className="px-4 py-2 border-b border-slate-600/50 align-top" {...props} />,
+                      tr: ({node, ...props}) => <tr className="even:bg-slate-800/30 hover:bg-slate-600/20 transition-colors" {...props} />,
+                      h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-5 mb-2 text-slate-100 border-b border-slate-600/50 pb-1" {...props} />,
+                      h3: ({node, ...props}) => <h3 className="text-base font-semibold mt-4 mb-1.5 text-slate-200" {...props} />,
+                      p: ({node, ...props}) => <p className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2 space-y-1" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2 space-y-1" {...props} />,
+                      li: ({node, ...props}) => <li className="mb-1 leading-relaxed" {...props} />,
+                      strong: ({node, ...props}) => <strong className="text-slate-50 font-semibold" {...props} />,
                       a: ({node, ...props}) => <a className="text-blue-400 hover:underline" {...props} />,
+                      hr: ({node, ...props}) => <hr className="border-slate-600/50 my-3" {...props} />,
                       code: ({node, inline, ...props}) => inline ? <code className="bg-slate-800 px-1 rounded text-blue-300" {...props} /> : <pre className="bg-slate-800 p-2 rounded overflow-x-auto mb-2"><code {...props} /></pre>
                     }}
                   >

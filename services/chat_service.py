@@ -132,7 +132,7 @@ class MedicalChatService:
             
             # Get response from Ollama or external API
             if provider == "ollama":
-                response_data = self._call_ollama(messages)
+                response_data = self._call_ollama(messages, model_override=model)
             else:
                 response_data = self._call_external_api(messages, provider, api_key, model)
             
@@ -329,17 +329,33 @@ class MedicalChatService:
         return detected_flags
     
     def _prepare_messages(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> List[Dict]:
-        """Prepare messages array for Ollama API."""
+        """Prepare messages array for LLM API with dynamic medical context."""
         messages = []
         
-        # Add system prompt
+        # Base system prompt
         system_prompt = config.get_medical_prompts()["chat_system"]
+        
+        # DYNAMIC CONTEXT INJECTION - "Reading relevant service files"
+        # Search for medical knowledge related to the user's message
+        clinical_context = ""
+        query_lower = user_message.lower()
+        
+        # Extract relevant condition info from medical_knowledge service
+        for category, conditions in medical_knowledge.medical_conditions.items():
+            for condition_name, data in conditions.items():
+                if any(keyword in query_lower for keyword in data.get("symptoms", [])):
+                    clinical_context += f"\n- {condition_name.replace('_', ' ').upper()}: Symptoms: {', '.join(data.get('symptoms'))}. Red Flags: {', '.join(data.get('red_flags'))}. Action: {data.get('immediate_action')}."
+        
+        if clinical_context:
+            system_prompt += f"\n\nRELEVANT CLINICAL CONTEXT FOR THIS QUERY:{clinical_context}"
+            logger.info(f"Injected clinical context for query: {user_message[:50]}...")
+
         messages.append({
             "role": "system",
             "content": system_prompt
         })
         
-        # Add chat history (last 10 messages to stay within context)
+        # Add chat history (last 10 messages)
         if chat_history:
             recent_history = chat_history[-10:] if len(chat_history) > 10 else chat_history
             for msg in recent_history:
@@ -356,12 +372,15 @@ class MedicalChatService:
         
         return messages
     
-    def _call_ollama(self, messages: List[Dict]) -> Dict[str, Any]:
+    def _call_ollama(self, messages: List[Dict], model_override: str = None) -> Dict[str, Any]:
         """Universal cross-platform Ollama API call with robust error handling."""
+
+        # Use model from settings if provided, otherwise use auto-detected model
+        active_model = model_override.strip() if model_override and model_override.strip() else self.model
 
         # Optimized performance for laptop - balanced resource usage
         payload = {
-            "model": self.model,
+            "model": active_model,
             "messages": messages,
             "stream": False,
             "options": {
@@ -376,7 +395,7 @@ class MedicalChatService:
             }
         }
 
-        logger.info(f"Using {self.model} on {platform.system()}")
+        logger.info(f"Using {active_model} on {platform.system()} (override={'yes' if model_override else 'no'})")
 
         # Retry with progressive fallback
         for attempt in range(self.retry_attempts):
@@ -392,11 +411,11 @@ class MedicalChatService:
                 if response.status_code == 200:
                     data = response.json()
                     if 'message' in data and 'content' in data['message']:
-                        logger.info(f"✅ Response received from {self.model} (attempt {attempt + 1})")
+                        logger.info(f"✅ Response received from {active_model} (attempt {attempt + 1})")
                         return {
                             "success": True,
                             "response": data['message']['content'],
-                            "model_used": self.model,
+                            "model_used": active_model,
                             "attempt": attempt + 1
                         }
                     else:
@@ -405,14 +424,22 @@ class MedicalChatService:
 
                 elif response.status_code == 404:
                     # Model not found - try fallback
-                    logger.warning(f"Model {self.model} not found, trying fallback...")
+                    logger.warning(f"Model {active_model} not found, trying fallback...")
+                    if model_override:
+                        # User explicitly chose this model - don't silently fallback
+                        return {
+                            "success": False,
+                            "response": f"❌ Model `{active_model}` not found in Ollama. Make sure the model is pulled (run `ollama pull {active_model}` in terminal) or check the model name in Settings.",
+                            "error_type": "model_not_found"
+                        }
                     if self._try_fallback_model():
-                        payload["model"] = self.model
+                        active_model = self.model
+                        payload["model"] = active_model
                         continue
                     else:
                         return {
                             "success": False,
-                            "error": f"Model {self.model} not available and no fallbacks found",
+                            "response": f"❌ Model `{active_model}` not available and no fallbacks found.",
                             "error_type": "model_not_found"
                         }
                 else:

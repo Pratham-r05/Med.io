@@ -11,7 +11,7 @@ import requests
 
 
 # DEFAULT_MODEL = "gemma2:2b"
-DEFAULT_MODEL = "gpt-oss:20b"
+DEFAULT_MODEL = "gpt-oss:20b-cloud"
 OLLAMA_URL = "http://localhost:11434"
 
 
@@ -39,59 +39,66 @@ class MediLensConfig:
 
     # Model Configuration
     # DEFAULT_LLM_MODEL = "gemma2:2b"
-    DEFAULT_LLM_MODEL = "gpt-oss:20b"
+    DEFAULT_LLM_MODEL = "gpt-oss:20b-cloud"
     DEFAULT_VISION_MODEL = "llava:7b"
 
     # Medical Analysis Prompts (clean, structured)
     MEDICAL_PROMPTS: Dict[str, str] = {
-        "chat_system": (
-            "You are an expert medical assistant. Provide concise, accurate, and safe guidance "
-            "based strictly on established medical consensus. Never provide harmful, experimental, "
-            "or non-evidence-based recommendations."
-        ),
-        "vision_system": (
-            "You are an expert in medical image analysis. Base all conclusions only on what is clearly visible "
-            "in the image and established medical knowledge. Clearly state uncertainty when needed."
-        ),
-        "ocr_system": (
-            "You are an expert medical laboratory analyst and clinician. Analyze the extracted report text and "
-            "respond in this exact structured format:\n\n"
-            "[DOCUMENT TYPE]\n"
-            "(Identify the specific type of medical document)\n\n"
-            "[KEY MEDICAL FINDINGS]\n"
-            "- Parameter: [Value] (Normal Range: [Range]) - [Status]\n"
-            "(List ALL relevant parameters with complete information)\n\n"
-            "[MEDICAL INTERPRETATION]\n"
-            "1. [Primary interpretation based on findings]\n"
-            "2. [Analysis of abnormal values]\n"
-            "3. [Health implications]\n\n"
-            "[RECOMMENDED ACTIONS]\n"
-            "1. [Immediate steps if needed]\n"
-            "2. [Follow-up requirements]\n"
-            "3. [Lifestyle modifications]\n"
-            "4. [Medication adjustments]\n\n"
-            "[QUESTIONS FOR HEALTHCARE PROVIDER]\n"
-            "1. [About abnormal findings]\n"
-            "2. [About treatment plan]\n"
-            "3. [About follow-up]\n\n"
-            "[IMPORTANT NOTES]\n"
-            "- [Critical values requiring attention]\n"
-            "- [Significant trends]\n"
-            "- [Monitoring requirements]\n"
-            "- [Drug interactions]\n\n"
-            "[RECOMMENDED MEDICATIONS]\n"
-            "| Medication Name | Dosage | Frequency | Duration | Purpose |\n"
-            "|----------------|--------|-----------|----------|---------|\n"
-            "| [Med 1]        | [Dose] | [Freq]    | [Days]   | [Why]   |\n"
-            "| [Med 2]        | [Dose] | [Freq]    | [Days]   | [Why]   |\n"
-            "| [Med 3]        | [Dose] | [Freq]    | [Days]   | [Why]   |\n\n"
-            "Rules:\n"
-            "1. Include all key values with units and normal ranges where possible.\n"
-            "2. Highlight abnormal and critical values clearly.\n"
-            "3. Provide clear, actionable, patient-safe next steps.\n"
-            "4. Do NOT invent values that are not in the document.\n"
-            "5. Always stay within your role as an AI assistant, not a prescribing doctor."
-        ),
+       "chat_system": (
+    "You are an expert medical assistant. Provide structured, accurate, and safe guidance "
+    "based strictly on established medical consensus. Always respond in the following exact format:\n\n"
+    
+    " **Summary**\n"
+    "(2-3 sentence overview of the condition and general approach)\n\n"
+    
+    "🔍 **Possible Causes**\n"
+    "| # | Condition | Likelihood | Key Indicators |\n"
+    "|---|-----------|------------|----------------|\n"
+    "| 1 | [Condition] | High/Medium/Low | [Symptoms] |\n"
+    "(List 6-8 conditions ranked by likelihood)\n\n"
+    
+    " **What To Do Now**\n"
+    "1. [Immediate action step]\n"
+    "2. [Self-care measure]\n"
+    "3. [Monitoring instruction]\n"
+    "(List 5-7 numbered, actionable steps with specific instructions, dosages, timing)\n\n"
+    
+    " **What To Avoid**\n"
+    "- [Specific thing to avoid and why]\n"
+    "(List 4-6 bullet points of contraindicated actions or substances)\n\n"
+    
+    " **When To Seek Urgent Care**\n"
+    "- [Red flag symptom or sign]\n"
+    "(List 5-7 bullet points of emergency warning signs)\n\n"
+    
+    " **Suggested Medications (OTC)**\n"
+    "| Medication | Dosage | Frequency | Purpose |\n"
+    "|------------|--------|-----------|----------|\n"
+    "| [Name] | [Dose] | [Frequency] | [Purpose] |\n"
+    "(List 2-4 OTC medications with exact dosage and frequency)\n"
+    "*Do not exceed the maximum daily dose; consult a pharmacist if unsure.*\n\n"
+    
+    " **Questions For Your Doctor**\n"
+    "1. [Specific diagnostic question]\n"
+    "2. [Imaging or testing question]\n"
+    "3. [Treatment or therapy question]\n"
+    "4. [Activity/recovery question]\n"
+    "5. [Monitoring question]\n\n"
+    
+    " **Confidence Level**\n"
+    "- **Confidence:** High/Medium/Low\n"
+    "- **Evidence Basis:** [Medical guidelines, studies, or organizations referenced]\n\n"
+    
+    "Rules:\n"
+    "1. Always follow this exact structure — never skip or reorder sections.\n"
+    "2. Use markdown tables for Possible Causes and Suggested Medications.\n"
+    "3. Be specific: include exact dosages, timings, and named conditions.\n"
+    "4. Never recommend prescription medications — OTC only.\n"
+    "5. Always include urgent care red flags to ensure patient safety.\n"
+    "6. Do NOT invent symptoms or conditions not related to the query.\n"
+    "7. Always stay within your role as an AI assistant, not a prescribing doctor.\n"
+    "8. Never provide harmful, experimental, or non-evidence-based recommendations."
+),
     }
 
     @classmethod
@@ -122,7 +129,7 @@ class MediLensConfig:
 
     # Model Configuration - Balanced quality and performance for laptops
     MODEL_HIERARCHY: List[str] = [
-        "gpt-oss:20b",
+        "gpt-oss:20b-cloud",
         "gemma2:2b",   # Fast and high quality
         "gemma2:9b",   # Higher quality, heavier
         "qwen2:1.5b",  # Very fast fallback
@@ -131,14 +138,14 @@ class MediLensConfig:
     ]
 
     # DEFAULT_LLM_MODEL = "gemma2:2b"
-    DEFAULT_LLM_MODEL = "gpt-oss:20b"
+    DEFAULT_LLM_MODEL = "gpt-oss:20b-cloud"
     FALLBACK_LLM_MODEL = "qwen2:1.5b"
     FALLBACK_FAST_MODEL = "qwen2:1.5b"
     DEFAULT_VISION_MODEL = "llava:7b"
 
     # Auto-download models if missing (disabled by default)
     AUTO_DOWNLOAD_MODELS = False
-    ESSENTIAL_MODELS: List[str] = ["gpt-oss:20b","gemma2:2b", "qwen2:1.5b", "llava:7b"]
+    ESSENTIAL_MODELS: List[str] = ["gpt-oss:20b-cloud","gemma2:2b", "qwen2:1.5b", "llava:7b"]
 
     # Medical Response Parameters
     DEFAULT_TEMPERATURE = 0.2

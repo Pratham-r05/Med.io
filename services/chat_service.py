@@ -86,8 +86,11 @@ class MedicalChatService:
                     if any(model in installed for installed in installed_models):
                         available_from_hierarchy.append(model)
 
-                if available_from_hierarchy:
-                    # Use best available model
+                if any(self.model in installed for installed in installed_models):
+                    system_info = platform.system()
+                    return True, f"✅ Connected to Ollama on {system_info} with {self.model}"
+                elif available_from_hierarchy:
+                    # Use best available model as fallback
                     self.model = available_from_hierarchy[0]
                     system_info = platform.system()
                     return True, f"✅ Connected to Ollama on {system_info} with {self.model}"
@@ -110,8 +113,8 @@ class MedicalChatService:
             return False, f"❌ Connection error: {str(e)}"
     
     
-    def get_medical_response(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
-        """Get structured medical response from Ollama."""
+    def get_medical_response(self, user_message: str, chat_history: Optional[List[Dict]] = None, provider: str = "ollama", api_key: str = "", model: str = None) -> Dict[str, Any]:
+        """Get structured medical response from Ollama or External APIs."""
         try:
             # Check if query is medical
             if not self._is_medical_query(user_message):
@@ -127,8 +130,11 @@ class MedicalChatService:
             # Prepare messages for Ollama
             messages = self._prepare_messages(user_message, chat_history)
             
-            # Get response from Ollama
-            response_data = self._call_ollama(messages)
+            # Get response from Ollama or external API
+            if provider == "ollama":
+                response_data = self._call_ollama(messages)
+            else:
+                response_data = self._call_external_api(messages, provider, api_key, model)
             
             if response_data["success"]:
                 # CRITICAL MEDICAL SAFETY VALIDATION
@@ -296,8 +302,19 @@ class MedicalChatService:
     
     def _is_medical_query(self, message: str) -> bool:
         """Check if the query is medical/health-related using enhanced SafetyGuard."""
+        # Allow basic greetings and short messages to pass through to the LLM for a natural UX
+        clean_msg = message.lower().strip()
+        greetings = ['hi', 'hii', 'hello', 'hey', 'gii', 'greetings', 'sup', 'morning', 'evening', 'help']
+        if any(clean_msg == g or clean_msg.startswith(g + " ") for g in greetings) or len(clean_msg.split()) < 3:
+            return True
+            
         # Use the enhanced SafetyGuard classification that includes snake bites and comprehensive medical vocabulary
         result = self.safety_guard.is_medical_query(message)
+        
+        # Fallback for common typos like 'ferver' instead of 'fever'
+        if not result["is_medical"] and "what should i do" in clean_msg:
+            return True
+            
         return result["is_medical"]
     
     def _detect_red_flags(self, message: str) -> List[str]:
@@ -470,6 +487,150 @@ class MedicalChatService:
             return False
         except:
             return False
+
+    def _call_external_api(self, messages: List[Dict], provider: str, api_key: str, model: str) -> Dict[str, Any]:
+        """Call external APIs (Anthropic, OpenRouter, OpenAI, Gemini) using requests."""
+        if not api_key:
+            return {
+                "success": False,
+                "error": f"API key is required for {provider}.",
+                "error_type": "missing_api_key"
+            }
+        
+        if not model:
+            return {
+                "success": False,
+                "error": f"Model name is required for {provider}.",
+                "error_type": "missing_model"
+            }
+
+        try:
+            logger.info(f"Calling external API: provider={provider}, model={model}")
+
+            if provider == "anthropic":
+                # Anthropic API format
+                url = "https://api.anthropic.com/v1/messages"
+                headers = {
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json"
+                }
+                
+                # Anthropic uses a separate 'system' parameter, so we extract it
+                system_prompt = ""
+                anthropic_messages = []
+                for msg in messages:
+                    if msg["role"] == "system":
+                        system_prompt = msg["content"]
+                    else:
+                        anthropic_messages.append({"role": msg["role"], "content": msg["content"]})
+                        
+                payload = {
+                    "model": model,
+                    "max_tokens": config.DEFAULT_MAX_TOKENS,
+                    "temperature": config.CHAT_TEMPERATURE,
+                    "system": system_prompt,
+                    "messages": anthropic_messages
+                }
+                
+                response = requests.post(url, headers=headers, json=payload, timeout=config.OLLAMA_TIMEOUT)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    content = data.get("content", [])[0].get("text", "")
+                    return {"success": True, "response": content, "model_used": model}
+                else:
+                    return {"success": False, "error": f"Anthropic API Error: {response.text}", "error_type": "api_error"}
+
+            elif provider in ["openai", "openrouter"]:
+                # OpenAI / OpenRouter format
+                url = "https://api.openai.com/v1/chat/completions" if provider == "openai" else "https://openrouter.ai/api/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                }
+                
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": config.CHAT_TEMPERATURE,
+                    "max_tokens": config.DEFAULT_MAX_TOKENS
+                }
+                
+                # OpenRouter specific headers
+                if provider == "openrouter":
+                    headers["HTTP-Referer"] = "http://localhost:8000"
+                    headers["X-Title"] = "Med.io"
+                    
+                response = requests.post(url, headers=headers, json=payload, timeout=config.OLLAMA_TIMEOUT)
+                
+                logger.info(f"{provider} API response status: {response.status_code}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    choices = data.get("choices", [])
+                    if choices:
+                        content = choices[0].get("message", {}).get("content", "")
+                        return {"success": True, "response": content, "model_used": model}
+                    else:
+                        return {"success": False, "error": f"{provider}: Empty response from API", "error_type": "api_error"}
+                else:
+                    # Parse error body for cleaner message
+                    try:
+                        err = response.json()
+                        err_msg = err.get("error", {}).get("message", "") if isinstance(err.get("error"), dict) else str(err.get("error", response.text))
+                    except Exception:
+                        err_msg = response.text[:500]
+                    return {"success": False, "error": f"{provider} API Error ({response.status_code}): {err_msg}", "error_type": "api_error"}
+                    
+            elif provider == "gemini":
+                # Google Gemini format
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+                headers = {"Content-Type": "application/json"}
+                
+                system_prompt = ""
+                gemini_contents = []
+                for msg in messages:
+                    if msg["role"] == "system":
+                        system_prompt = msg["content"]
+                    else:
+                        role = "user" if msg["role"] == "user" else "model"
+                        gemini_contents.append({"role": role, "parts": [{"text": msg["content"]}]})
+                        
+                payload = {
+                    "contents": gemini_contents,
+                    "generationConfig": {
+                        "temperature": config.CHAT_TEMPERATURE,
+                        "maxOutputTokens": config.DEFAULT_MAX_TOKENS
+                    }
+                }
+                
+                if system_prompt:
+                    payload["systemInstruction"] = {
+                        "parts": [{"text": system_prompt}]
+                    }
+                    
+                response = requests.post(url, headers=headers, json=payload, timeout=config.OLLAMA_TIMEOUT)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    content = data.get("candidates", [])[0].get("content", {}).get("parts", [])[0].get("text", "")
+                    return {"success": True, "response": content, "model_used": model}
+                else:
+                    return {"success": False, "error": f"Gemini API Error: {response.text}", "error_type": "api_error"}
+
+            else:
+                return {"success": False, "error": f"Unknown provider: {provider}", "error_type": "unknown_provider"}
+                
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout calling {provider} API")
+            return {"success": False, "error": f"{provider} API timed out. Try again or use a different model.", "error_type": "timeout"}
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error calling {provider} API")
+            return {"success": False, "error": f"Cannot connect to {provider} API. Check your internet connection.", "error_type": "connection_error"}
+        except Exception as e:
+            logger.error(f"Error calling {provider} API: {str(e)}")
+            return {"success": False, "error": f"Error calling {provider} API: {str(e)}", "error_type": "api_exception"}
     
     def _structure_response(self, raw_response: str) -> Dict[str, Any]:
         """Structure the raw Ollama response - SIMPLIFIED FOR GUARANTEED DISPLAY."""

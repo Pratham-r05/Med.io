@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    @apply bg-black min-h-screen h-full m-0 p-0;
+  }
+  body {
+    @apply bg-black min-h-screen h-full m-0 p-0 text-slate-100;
+  }
+}
+
+@layer utilities {
+  .bg-gradient-primary {
+    @apply bg-gradient-to-br from-blue-500 to-blue-700;
+  }
+  .bg-gradient-secondary {
+    @apply bg-gradient-to-br from-slate-600 to-slate-800;
+  }
+  
+  /* Scrollbar hiding utilities */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Animations */
+  .animate-in {
+    animation-duration: 300ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: both;
+  }
+  
+  .fade-in {
+    animation-name: fadeIn;
+  }
+  
+  .slide-in-from-top-1 {
+    animation-name: slideInFromTop1;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideInFromTop1 {
+  from { transform: translateY(-0.25rem); }
+  to { transform: translateY(0); }
+}
+
+/* Float Animations */
+@keyframes float1 {
+  0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0.15; }
+  25% { transform: translateY(-20px) translateX(10px) rotate(90deg); opacity: 0.2; }
+  50% { transform: translateY(0) translateX(-10px) rotate(180deg); opacity: 0.15; }
+  75% { transform: translateY(20px) translateX(5px) rotate(270deg); opacity: 0.2; }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0.15; }
+  33% { transform: translateY(30px) translateX(-20px) rotate(120deg); opacity: 0.2; }
+  66% { transform: translateY(-15px) translateX(15px) rotate(240deg); opacity: 0.15; }
+}
+
+.animate-float1 { animation: float1 20s infinite ease-in-out; }
+.animate-float2 { animation: float2 25s infinite ease-in-out; }
+.animate-float3 { animation: float1 30s infinite ease-in-out; }
+.animate-float4 { animation: float2 22s infinite ease-in-out; }
+.animate-float5 { animation: float1 28s infinite ease-in-out; }
+.animate-float6 { animation: float2 24s infinite ease-in-out; }

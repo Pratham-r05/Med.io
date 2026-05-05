@@ -1,0 +1,176 @@
+import { useState, useRef, useEffect } from 'react';
+import axios from 'axios';
+import { Send, Loader2, MessageSquare } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+export default function Chat() {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('medilens_chat_history');
+    if (saved) {
+      setMessages(JSON.parse(saved));
+    }
+
+    const handleClearChat = () => setMessages([]);
+    window.addEventListener('clear_chat', handleClearChat);
+    return () => window.removeEventListener('clear_chat', handleClearChat);
+  }, []);
+
+  const saveHistory = (newMessages) => {
+    localStorage.setItem('medilens_chat_history', JSON.stringify(newMessages));
+  };
+
+  const handleSend = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMsg = { role: 'user', content: input.trim() };
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
+    saveHistory(newMessages);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      const historyToSend = messages.map(m => ({ role: m.role, content: m.content }));
+      
+      const provider = localStorage.getItem('medilens_provider') || 'ollama';
+      const api_key = localStorage.getItem('medilens_api_key') || '';
+      const model = localStorage.getItem('medilens_model') || '';
+
+      console.log('🔑 API Config:', { provider, api_key: api_key ? '***set***' : '(empty)', model });
+
+      const response = await axios.post(`${API_URL}/chat`, {
+        message: userMsg.content,
+        history: historyToSend,
+        provider,
+        api_key,
+        model
+      });
+
+      const data = response.data;
+      let aiContent = "❌ Unknown error occurred.";
+      
+      if (data.success) {
+        if (typeof data.response === 'string') {
+          aiContent = data.response;
+        } else if (data.response?.summary) {
+          aiContent = data.response.summary;
+        } else if (data.response?.raw_response) {
+          aiContent = data.response.raw_response;
+        } else {
+          aiContent = "❌ No response generated.";
+        }
+      } else {
+        if (typeof data.response === 'string') {
+          aiContent = data.response;
+        } else if (data.error) {
+          aiContent = `❌ ${data.error}`;
+        } else {
+          aiContent = `❌ Error: ${data.detail || 'Unknown error'}`;
+        }
+      }
+
+      const aiMsg = { role: 'assistant', content: aiContent };
+      const updatedMessages = [...newMessages, aiMsg];
+      setMessages(updatedMessages);
+      saveHistory(updatedMessages);
+
+    } catch (error) {
+      const errorMsg = { role: 'assistant', content: `❌ Connection error: ${error.message}` };
+      const updatedMessages = [...newMessages, errorMsg];
+      setMessages(updatedMessages);
+      saveHistory(updatedMessages);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full max-w-4xl mx-auto w-full p-4 relative z-10">
+      
+      {messages.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 opacity-40">
+          <MessageSquare size={48} className="mb-4 text-blue-500/50" />
+          <p className="text-slate-500 font-medium tracking-wide">Start a conversation to get medical insights</p>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 no-scrollbar rounded-xl bg-transparent">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div 
+                className={`max-w-[60%] ${
+                  msg.role === 'user' 
+                    ? 'whitespace-pre-wrap bg-blue-600 text-white rounded-2xl px-4 py-2 rounded-tr-sm' 
+                    : 'bg-slate-700 text-slate-100 rounded-2xl px-4 py-2 rounded-tl-sm prose prose-invert max-w-none'
+                }`}
+              >
+                {msg.role === 'user' ? (
+                  msg.content
+                ) : (
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      table: ({node, ...props}) => <div className="overflow-x-auto my-4"><table className="w-full text-sm text-left border-collapse border border-slate-600" {...props} /></div>,
+                      th: ({node, ...props}) => <th className="px-4 py-2 bg-slate-800 font-semibold border border-slate-600" {...props} />,
+                      td: ({node, ...props}) => <td className="px-4 py-2 border border-slate-600 align-top" {...props} />,
+                      p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-2" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-2" {...props} />,
+                      li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                      a: ({node, ...props}) => <a className="text-blue-400 hover:underline" {...props} />,
+                      code: ({node, inline, ...props}) => inline ? <code className="bg-slate-800 px-1 rounded text-blue-300" {...props} /> : <pre className="bg-slate-800 p-2 rounded overflow-x-auto mb-2"><code {...props} /></pre>
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                )}
+              </div>
+            </div>
+          ))}
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="max-w-[60%] bg-slate-700 text-slate-100 rounded-2xl px-4 py-2 rounded-tl-sm flex items-center space-x-2">
+                <Loader2 size={18} className="animate-spin text-blue-400" />
+                <span>Analyzing...</span>
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      )}
+
+      <div className="mt-4 shrink-0">
+        <form onSubmit={handleSend} className="relative flex items-center">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isLoading}
+            placeholder="Ask me anything medical..."
+            className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 pl-6 pr-14 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/30 transition-all disabled:opacity-50"
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading}
+            className="absolute right-2 p-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-blue-600/20 disabled:opacity-50 disabled:shadow-none"
+          >
+            {isLoading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}

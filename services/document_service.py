@@ -28,6 +28,7 @@ class DocumentProcessor:
     """Handles OCR, document processing, and medical analysis."""
     
     def __init__(self):
+        self.model = config.DEFAULT_LLM_MODEL
         self.tesseract_config = '--oem 3 --psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:-/()%+= '
         self.setup_tesseract()
 
@@ -348,7 +349,7 @@ class DocumentProcessor:
                 "error_type": "processing_error"
             }
     
-    def analyze_medical_document(self, extracted_text: str, ollama_base_url: str = None) -> Dict[str, Any]:
+    def analyze_medical_document(self, extracted_text: str, ollama_base_url: str = None, provider: str = "ollama", api_key: str = "", model_name: str = "") -> Dict[str, Any]:
         """Analyze medical document using context-driven LLM prompts."""
         try:
             if not ollama_base_url:
@@ -395,7 +396,32 @@ Base your entire analysis on the actual content extracted from this document. Qu
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ]
-            
+
+            # Use external API if configured
+            if provider != "ollama" and api_key and model_name:
+                try:
+                    from services.chat_service import MedicalChatService
+                    chat_svc = MedicalChatService()
+                    result = chat_svc._call_external_api(messages, provider, api_key, model_name)
+                    if result.get("success"):
+                        analysis = result["response"]
+                        medical_values = self.extract_medical_values(extracted_text)
+                        highlighted_analysis = self.highlight_critical_values(analysis)
+                        return {
+                            "success": True,
+                            "analysis": highlighted_analysis,
+                            "original_analysis": analysis,
+                            "medical_values": medical_values,
+                            "model_used": model_name,
+                            "provider": provider
+                        }
+                    else:
+                        logger.warning(f"External API failed for doc analysis: {result.get('error')}")
+                        # Fall through to Ollama if external fails
+                except Exception as e:
+                    logger.error(f"Error calling external API for doc analysis: {e}")
+                    # Fall through to Ollama
+
             # PREMIUM QUALITY: Use Gemma2:9B for comprehensive document analysis
             available_models = config.get_available_models()
 
@@ -416,8 +442,8 @@ Base your entire analysis on the actual content extracted from this document. Qu
                 }
             }
             
-            # Use premium model priority: gemma2:9b > gemma2:2b > qwen2:1.5b
-            premium_models = [config.DEFAULT_LLM_MODEL, config.FALLBACK_LLM_MODEL, config.FALLBACK_FAST_MODEL]
+            # Use user-selected model if available, otherwise fallback list
+            premium_models = [self.model] if hasattr(self, 'model') and self.model else [config.DEFAULT_LLM_MODEL, config.FALLBACK_LLM_MODEL, config.FALLBACK_FAST_MODEL]
             last_error = None
 
             for model_to_try in premium_models:

@@ -24,7 +24,8 @@ class VisionAnalyzer:
     """Handles medical image analysis using llava:7b vision model."""
     
     def __init__(self):
-        self.base_url = config.OLLAMA_BASE_URL
+        is_running, url, _ = config.detect_ollama_service()
+        self.base_url = url if is_running else config.OLLAMA_BASE_URL
         self.model = config.DEFAULT_VISION_MODEL
         self.timeout = config.OLLAMA_VISION_TIMEOUT  # Optimized timeout for faster vision analysis
         
@@ -301,19 +302,6 @@ USER REQUEST: {user_query if user_query else "Analyze this medical image for con
             available_models = [config.DEFAULT_VISION_MODEL]  # Vision models limited to llava for now
             
             for model_attempt, model_to_try in enumerate(available_models):
-                # Check if vision model is available
-                try:
-                    test_response = requests.get(f"{self.base_url}/api/tags", timeout=3)
-                    if test_response.status_code == 200:
-                        data = test_response.json()
-                        installed_models = [model['name'] for model in data.get('models', [])]
-                        if not any(model_to_try in installed for installed in installed_models):
-                            continue  # Skip this model if not installed
-                    else:
-                        continue
-                except:
-                    continue
-                
                 # Update payload with current model
                 payload["model"] = model_to_try  # Note: vision uses different API format
                 logger.info(f"Vision analysis with model: {model_to_try}")

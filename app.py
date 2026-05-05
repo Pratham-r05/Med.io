@@ -282,7 +282,7 @@ def load_css():
         height: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
-    }
+    }ex
 
     body {
         background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%) !important;

@@ -142,13 +142,13 @@ class MediLensConfig:
 
     # Medical Response Parameters
     DEFAULT_TEMPERATURE = 0.2
-    DEFAULT_MAX_TOKENS = 2000
+    DEFAULT_MAX_TOKENS = 4096
     CHAT_TEMPERATURE = 0.2
     OCR_TEMPERATURE = 0.2
     VISION_TEMPERATURE = 0.2
 
     # Optimized resource settings
-    NUM_CTX = 2048
+    NUM_CTX = 8192
     REPEAT_PENALTY = 1.15
     TOP_K = 40
     TOP_P = 0.9
@@ -242,12 +242,12 @@ class MediLensConfig:
             },
             "ocr": {
                 "temperature": cls.OCR_TEMPERATURE,
-                "max_tokens": 1000,
+                "max_tokens": 4096,
                 "stream": False,
             },
             "vision": {
                 "temperature": cls.VISION_TEMPERATURE,
-                "max_tokens": 1000,
+                "max_tokens": 4096,
                 "stream": False,
             },
         }

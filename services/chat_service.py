@@ -116,11 +116,19 @@ class MedicalChatService:
     def get_medical_response(self, user_message: str, chat_history: Optional[List[Dict]] = None, provider: str = "ollama", api_key: str = "", model: str = None) -> Dict[str, Any]:
         """Get structured medical response from Ollama or External APIs."""
         try:
+            if self._is_greeting(user_message):
+                return {
+                    "success": True,
+                    "response": "Hi. Ask a medical question anytime.",
+                    "timestamp": datetime.now().isoformat()
+                }
+
             # Check if query is medical
-            if not self._is_medical_query(user_message):
+            medical_check = self._get_medical_context_check(user_message, chat_history)
+            if not medical_check["is_medical"]:
                 return {
                     "success": False,
-                    "response": "I can help with medical and health-related questions. Please try rephrasing your question with medical context, symptoms, conditions, or health concerns.",
+                    "response": medical_check.get("rejection_message") or "Medical questions only.",
                     "error_type": "non_medical_query"
                 }
             
@@ -230,6 +238,10 @@ class MedicalChatService:
     def get_streaming_response(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> Generator[str, None, None]:
         """Get streaming medical response from Ollama with critical safety validation."""
         try:
+            if self._is_greeting(user_message):
+                yield "Hi. Ask a medical question anytime."
+                return
+
             # CRITICAL: Emergency safety check FIRST
             safety_analysis = medical_safety.analyze_medical_safety(user_message, "")
 
@@ -243,8 +255,9 @@ class MedicalChatService:
                 yield medical_safety.urgent_disclaimer + "\n\n---\n\n"
 
             # Check if query is medical
-            if not self._is_medical_query(user_message):
-                yield "I can help with medical and health-related questions. Please try rephrasing your question with medical context, symptoms, conditions, or health concerns."
+            medical_check = self._get_medical_context_check(user_message, chat_history)
+            if not medical_check["is_medical"]:
+                yield medical_check.get("rejection_message") or "Medical questions only."
                 return
 
             # Check for red-flag symptoms (legacy support)
@@ -300,15 +313,30 @@ class MedicalChatService:
             logger.error(f"Error in streaming response: {str(e)}")
             yield f"An error occurred: {str(e)}"
     
+    def _is_greeting(self, message: str) -> bool:
+        """Detect plain greetings without medical intent."""
+        clean_msg = re.sub(r"[^\w\s]", "", message.lower()).strip()
+        if not clean_msg:
+            return False
+
+        greeting_phrases = {
+            "hi",
+            "hii",
+            "hiii",
+            "hello",
+            "hey",
+            "hey there",
+            "hi there",
+            "good morning",
+            "good afternoon",
+            "good evening",
+        }
+        return clean_msg in greeting_phrases
+
     def _is_medical_query(self, message: str) -> bool:
         """Check if the query is medical/health-related using enhanced SafetyGuard."""
-        # Allow basic greetings and short messages to pass through to the LLM for a natural UX
-        clean_msg = message.lower().strip()
-        greetings = ['hi', 'hii', 'hello', 'hey', 'gii', 'greetings', 'sup', 'morning', 'evening', 'help']
-        if any(clean_msg == g or clean_msg.startswith(g + " ") for g in greetings) or len(clean_msg.split()) < 3:
-            return True
-            
         # Use the enhanced SafetyGuard classification that includes snake bites and comprehensive medical vocabulary
+        clean_msg = message.lower().strip()
         result = self.safety_guard.is_medical_query(message)
         
         # Fallback for common typos like 'ferver' instead of 'fever'
@@ -316,6 +344,98 @@ class MedicalChatService:
             return True
             
         return result["is_medical"]
+
+    def _get_medical_context_check(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
+        """Allow narrow follow-ups when prior context is clearly medical."""
+        base_check = self.safety_guard.is_medical_query(user_message)
+        if base_check["is_medical"]:
+            return base_check
+
+        if self._is_medical_followup(user_message, chat_history):
+            return {
+                "is_medical": True,
+                "confidence": 0.6,
+                "reason": "medical_followup_from_context",
+                "rejection_message": None,
+            }
+
+        return base_check
+
+    def _is_medical_followup(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> bool:
+        """Detect follow-up questions that rely on recent medical context."""
+        if not chat_history:
+            return False
+
+        clean_msg = re.sub(r"\s+", " ", user_message.lower()).strip()
+        if not clean_msg:
+            return False
+
+        context = self._get_recent_medical_context(chat_history)
+        if not context:
+            return False
+
+        recent_context_text = f"{context.get('user','')} {context.get('assistant','')}".strip().lower()
+
+        followup_starters = [
+            "what should i", "can i", "should i", "is it ok", "is it safe",
+            "what about", "how about", "when can i", "do i need", "which one",
+            "what can i", "can we", "can u", "can you", "will it", "is this"
+        ]
+        followup_terms = [
+            "eat", "drink", "food", "meal", "rest", "sleep", "walk", "travel",
+            "bath", "shower", "exercise", "medicine", "medication", "painkiller",
+            "tablet", "pill", "bandage", "ice", "heat", "ointment", "cream",
+            "today", "now", "later", "tomorrow", "first", "water", "tea",
+            "coffee", "milk", "rice", "fruit", "spicy", "alcohol"
+        ]
+        typo_terms = ["eear", "medicin", "medcine", "tablte", "foood"]
+        unrelated_markers = [
+            "capital of", "javascript", "python code", "center a div",
+            "movie", "football", "cricket score", "weather in", "bitcoin"
+        ]
+
+        is_short_followup = len(clean_msg.split()) <= 12
+        has_followup_shape = (
+            any(clean_msg.startswith(starter) for starter in followup_starters) or
+            any(term in clean_msg for term in followup_terms) or
+            any(term in clean_msg for term in typo_terms)
+        )
+        seems_unrelated = any(term in clean_msg for term in unrelated_markers)
+        has_recent_medical_context = bool(recent_context_text)
+
+        return is_short_followup and has_followup_shape and has_recent_medical_context and not seems_unrelated
+
+    def _get_recent_medical_context(self, chat_history: Optional[List[Dict]] = None) -> Optional[Dict[str, str]]:
+        """Return the latest relevant medical user turn and nearby assistant answer."""
+        if not chat_history:
+            return None
+
+        relevant_user = None
+        relevant_assistant = ""
+
+        for idx in range(len(chat_history) - 1, -1, -1):
+            msg = chat_history[idx]
+            if msg.get("role") != "user":
+                continue
+
+            content = msg.get("content", "")
+            if self.safety_guard.is_medical_query(content).get("is_medical", False):
+                relevant_user = content
+
+                for j in range(idx + 1, min(idx + 4, len(chat_history))):
+                    next_msg = chat_history[j]
+                    if next_msg.get("role") == "assistant":
+                        relevant_assistant = next_msg.get("content", "")
+                        break
+                break
+
+        if not relevant_user:
+            return None
+
+        return {
+            "user": relevant_user,
+            "assistant": relevant_assistant[:1200],
+        }
     
     def _detect_red_flags(self, message: str) -> List[str]:
         """Detect red-flag symptoms requiring urgent medical attention."""
@@ -334,6 +454,7 @@ class MedicalChatService:
         
         # Base system prompt
         system_prompt = config.get_medical_prompts()["chat_system"]
+        system_prompt += self._build_response_style_prompt(user_message, chat_history)
         
         # DYNAMIC CONTEXT INJECTION - "Reading relevant service files"
         # Search for medical knowledge related to the user's message
@@ -371,6 +492,95 @@ class MedicalChatService:
         })
         
         return messages
+
+    def _build_response_style_prompt(self, user_message: str, chat_history: Optional[List[Dict]] = None) -> str:
+        """Choose scenario-based response format instructions."""
+        query_lower = user_message.lower()
+        is_followup = self._is_medical_followup(user_message, chat_history)
+        recent_context = self._get_recent_medical_context(chat_history)
+        context_user = (recent_context or {}).get("user", "")
+        combined_context = f"{context_user.lower()} {query_lower}".strip()
+
+        medication_terms = [
+            "medicine", "medication", "medications", "tablet", "pill",
+            "drug", "painkiller", "dose", "dosage", "tylenol", "ibuprofen",
+            "paracetamol", "acetaminophen", "benadryl"
+        ]
+        action_terms = [
+            "what should i do", "what to do", "what do i do",
+            "first aid", "next step", "help me", "got bit", "bite"
+        ]
+        cause_terms = [
+            "cause", "causes", "why", "reason", "diagnosis",
+            "diagnose", "what is this", "what could this be"
+        ]
+        symptom_terms = [
+            "symptom", "symptoms", "sign", "signs", "feel", "feeling"
+        ]
+
+        has_medication_intent = any(term in query_lower for term in medication_terms)
+        has_action_intent = any(term in query_lower for term in action_terms)
+        has_cause_intent = any(term in query_lower for term in cause_terms)
+        has_symptom_intent = any(term in query_lower for term in symptom_terms)
+        has_bite_context = "snake bite" in combined_context or "snake" in combined_context
+
+        if has_medication_intent and is_followup:
+            return (
+                "\n\nRESPONSE STYLE FOR THIS TURN:\n"
+                "This is a medication-focused question.\n"
+                "Do not repeat the full earlier answer.\n"
+                f"Previous relevant medical question: {context_user}\n"
+                "Prefer this order:\n"
+                "1. Summary\n"
+                "2. Suggested Medications (OTC)\n"
+                "3. What To Avoid\n"
+                "4. When To Seek Urgent Care\n"
+                "Keep possible causes out unless the user explicitly asked for them.\n"
+                "If the condition is dangerous, say OTC medicines only support symptoms and do not treat the core emergency.\n"
+                + ("The active context is snake bite or possible envenomation.\n" if has_bite_context else "")
+            )
+
+        if has_action_intent and not is_followup:
+            return (
+                "\n\nRESPONSE STYLE FOR THIS TURN:\n"
+                "This is a new medical action-focused question.\n"
+                "Give a complete structured answer.\n"
+                "Prefer this order:\n"
+                "1. Summary\n"
+                "2. Possible Causes\n"
+                "3. What To Do Now\n"
+                "4. What To Avoid\n"
+                "5. When To Seek Urgent Care\n"
+                "6. Confidence Level\n"
+                "Use a table for Possible Causes when clinically helpful.\n"
+                "Do not include medication tables unless the user asked for medicines.\n"
+            )
+
+        if is_followup:
+            return (
+                "\n\nRESPONSE STYLE FOR THIS TURN:\n"
+                "This is a medical follow-up question.\n"
+                f"Previous relevant medical question: {context_user}\n"
+                "Answer only the follow-up point using the prior chat context.\n"
+                "Do not repeat full causes, full first-aid steps, or repeated warning blocks unless needed for safety.\n"
+                "If the user asks about food, drink, activity, or daily care, answer that narrow topic directly.\n"
+                "If the follow-up is slightly unclear, infer the likely intent from recent context and answer briefly.\n"
+            )
+
+        if has_cause_intent or has_symptom_intent:
+            return (
+                "\n\nRESPONSE STYLE FOR THIS TURN:\n"
+                "This is a new explanation-focused medical question.\n"
+                "Give a complete structured answer.\n"
+                "Prefer Summary, Possible Causes, Common Symptoms or key indicators, What To Do Now, When To Seek Urgent Care, and Confidence Level.\n"
+                "Use a differential table when it adds value.\n"
+            )
+
+        return (
+            "\n\nRESPONSE STYLE FOR THIS TURN:\n"
+            "This is a new medical query.\n"
+            "Give a complete structured answer with the necessary sections for safe medical guidance.\n"
+        )
     
     def _call_ollama(self, messages: List[Dict], model_override: str = None) -> Dict[str, Any]:
         """Universal cross-platform Ollama API call with robust error handling."""

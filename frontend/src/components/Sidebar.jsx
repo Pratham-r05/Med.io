@@ -28,6 +28,10 @@ export default function Sidebar({ onClose }) {
   const [apiModel, setApiModel] = useState(localStorage.getItem('medilens_model') || '');
 
   const navigate = useNavigate();
+  const activeSidebarModel =
+    apiProvider === 'ollama'
+      ? (status.active_model || apiModel || 'None')
+      : (apiModel || status.active_model || 'None');
 
   const fetchStatus = async () => {
     try {
@@ -42,6 +46,17 @@ export default function Sidebar({ onClose }) {
     fetchStatus();
     const interval = setInterval(fetchStatus, 5000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const syncApiSettings = () => {
+      setApiProvider(localStorage.getItem('medilens_provider') || 'ollama');
+      setApiKey(localStorage.getItem('medilens_api_key') || '');
+      setApiModel(localStorage.getItem('medilens_model') || '');
+    };
+
+    window.addEventListener('api_settings_changed', syncApiSettings);
+    return () => window.removeEventListener('api_settings_changed', syncApiSettings);
   }, []);
 
   const handleModelSwitch = async (modelName) => {
@@ -72,109 +87,117 @@ export default function Sidebar({ onClose }) {
   );
 
   return (
-    <div className="w-80 h-full bg-black border-r border-white/5 flex flex-col text-slate-100 overflow-y-auto no-scrollbar relative group">
-      {/* Close Toggle Button */}
+    <div className="w-80 h-full bg-black border-r border-white/10 flex flex-col text-white overflow-y-auto no-scrollbar relative">
       <button 
         onClick={onClose}
-        className="absolute right-4 top-6 p-2 text-slate-500 hover:text-white transition-all hover:bg-white/5 rounded-lg z-50"
+        className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-md border border-white/10 text-white/50 transition-colors hover:border-white/20 hover:text-white"
       >
         <PanelLeftClose size={20} />
       </button>
 
-      <div className="p-6">
-        <div>
-          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500 mb-1 flex items-center gap-2">
-            <span className="text-blue-500">🏥</span> Med.io
+      <div className="border-b border-white/10 px-6 py-6">
+        <div className="pr-12">
+          <h1 className="mb-2 text-[2.1rem] font-semibold tracking-[-0.04em] text-white">
+            <span className="font-serif italic font-normal text-white/92">Med</span>
+            <span className="mx-0.5 font-light text-white/45">.</span>
+            <span className="font-sans font-semibold tracking-[-0.06em] text-white">io</span>
           </h1>
-          <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Your Private Medical AI</p>
+          <p className="text-[11px] font-medium uppercase tracking-[0.28em] text-white/45">
+            Your Private Medical AI
+          </p>
         </div>
       </div>
 
-      <div className="px-3 py-2">
-        <nav className="space-y-1 mt-4">
+      <div className="border-b border-white/10 px-4 py-5">
+        <nav className="space-y-2">
           <NavLink
             to="/chat"
             className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              `flex items-center gap-3 rounded-md border px-4 py-3 text-[15px] font-medium transition-colors ${
                 isActive 
-                  ? 'bg-blue-600/10 text-blue-400 shadow-[inset_0_0_10px_rgba(59,130,246,0.1)] border border-blue-500/20' 
-                  : 'hover:bg-white/5 text-slate-400 hover:text-slate-100 border border-transparent'
+                  ? 'border-white bg-white text-black' 
+                  : 'border-transparent text-white/60 hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`
             }
           >
-            <MessageSquare size={22} className="min-w-[22px]" />
-            <span className="font-medium">Medical Chat</span>
+            <MessageSquare size={19} className="min-w-[19px]" />
+            <span>Medical Chat</span>
           </NavLink>
           
           <NavLink
             to="/documents"
             className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              `flex items-center gap-3 rounded-md border px-4 py-3 text-[15px] font-medium transition-colors ${
                 isActive 
-                  ? 'bg-purple-600/10 text-purple-400 shadow-[inset_0_0_10px_rgba(168,85,247,0.1)] border border-purple-500/20' 
-                  : 'hover:bg-white/5 text-slate-400 hover:text-slate-100 border border-transparent'
+                  ? 'border-white bg-white text-black' 
+                  : 'border-transparent text-white/60 hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`
             }
           >
-            <FileText size={22} className="min-w-[22px]" />
-            <span className="font-medium">Report Analysis</span>
+            <FileText size={19} className="min-w-[19px]" />
+            <span>Report Analysis</span>
           </NavLink>
 
           <NavLink
             to="/images"
             className={({ isActive }) =>
-              `flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              `flex items-center gap-3 rounded-md border px-4 py-3 text-[15px] font-medium transition-colors ${
                 isActive 
-                  ? 'bg-teal-600/10 text-teal-400 shadow-[inset_0_0_10px_rgba(20,184,166,0.1)] border border-teal-500/20' 
-                  : 'hover:bg-white/5 text-slate-400 hover:text-slate-100 border border-transparent'
+                  ? 'border-white bg-white text-black' 
+                  : 'border-transparent text-white/60 hover:border-white/10 hover:bg-white/5 hover:text-white'
               }`
             }
           >
-            <ImageIcon size={22} className="min-w-[22px]" />
-            <span className="font-medium">Image Analysis</span>
+            <ImageIcon size={19} className="min-w-[19px]" />
+            <span>Image Analysis</span>
           </NavLink>
         </nav>
       </div>
 
-      <div className="px-4 py-6 mt-4">
-        <div className="flex items-center space-x-2 mb-4 px-2">
-          <div className={`w-2 h-2 rounded-full ${status.online ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-          <span className={`text-xs font-bold uppercase tracking-wider ${status.online ? 'text-green-500' : 'text-red-500'}`}>
+      <div className="border-b border-white/10 px-6 py-5">
+        <div className="mb-4 flex items-center gap-3">
+          <div className={`h-2 w-2 rounded-full ${status.online ? 'bg-white' : 'bg-white/35'}`}></div>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/70">
             {status.online ? 'System Online' : 'System Offline'}
           </span>
         </div>
         
-        {status.online && (
-          <div className="bg-white/[0.03] rounded-2xl p-4 border border-white/[0.05] mb-2 backdrop-blur-sm">
-            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5">
-              <Activity size={10} className="text-blue-500" /> Active Model
+        {(status.online || apiProvider !== 'ollama' || apiModel) && (
+          <div className="rounded-md border border-white/10 bg-white/[0.02] px-4 py-3.5">
+            <div className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">
+              <Activity size={12} /> Active Model
             </div>
-            <div className="text-sm font-semibold text-white truncate flex items-center gap-2">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-              {status.active_model || 'None'}
+            <div className="flex items-start gap-2 text-sm font-medium text-white">
+              <div className="h-1.5 w-1.5 rounded-full bg-white/70"></div>
+              <div className="min-w-0 flex-1">
+                <div className="break-all font-medium leading-6">{activeSidebarModel}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-[0.22em] text-white/35">
+                  {apiProvider}
+                </div>
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className="px-3 py-2 flex-grow">
-        <div className="mb-2">
+      <div className="flex-grow px-4 py-5">
+        <div className="mb-3">
           <button 
             onClick={() => setIsGuidelinesOpen(!isGuidelinesOpen)}
-            className="w-full flex items-center justify-between px-4 py-3 text-slate-400 hover:text-white transition-colors rounded-xl hover:bg-white/5"
+            className="flex w-full items-center justify-between rounded-md border border-transparent px-4 py-3 text-left text-white/65 transition-colors hover:border-white/10 hover:bg-white/5 hover:text-white"
           >
-            <div className="flex items-center space-x-3">
-              <Shield size={20} className="text-indigo-400" />
-              <span className="font-medium text-sm">Medical Guidelines</span>
+            <div className="flex items-center gap-3">
+              <Shield size={18} />
+              <span className="text-sm font-medium">Medical Guidelines</span>
             </div>
             {isGuidelinesOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
           
           {isGuidelinesOpen && (
-            <div className="mx-2 p-4 bg-white/[0.02] rounded-xl border border-white/[0.05] text-xs text-slate-400 space-y-3 mt-1 animate-in fade-in slide-in-from-top-1">
+            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.03] p-4 text-xs text-white/60 animate-in fade-in slide-in-from-top-1">
               <div>
-                <strong className="text-red-400/80 block mb-1 font-bold uppercase tracking-tighter">Disclaimer:</strong>
-                <ul className="list-disc pl-4 space-y-1.5 opacity-80">
+                <strong className="mb-2 block font-semibold uppercase tracking-[0.2em] text-white/45">Disclaimer</strong>
+                <ul className="list-disc space-y-1.5 pl-4">
                   <li>AI assistance, not diagnosis</li>
                   <li>Consult healthcare professionals</li>
                   <li>For emergencies, call 911</li>
@@ -187,23 +210,23 @@ export default function Sidebar({ onClose }) {
         <div className="mb-4">
           <button 
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className="w-full flex items-center justify-between px-4 py-3 text-slate-400 hover:text-white transition-colors rounded-xl hover:bg-white/5"
+            className="flex w-full items-center justify-between rounded-md border border-transparent px-4 py-3 text-left text-white/65 transition-colors hover:border-white/10 hover:bg-white/5 hover:text-white"
           >
-            <div className="flex items-center space-x-3">
-              <Settings size={20} className="text-slate-400" />
-              <span className="font-medium text-sm">Settings</span>
+            <div className="flex items-center gap-3">
+              <Settings size={18} />
+              <span className="text-sm font-medium">Settings</span>
             </div>
             {isSettingsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
           
           {isSettingsOpen && (
-            <div className="mx-2 p-4 bg-white/[0.02] rounded-xl border border-white/[0.05] text-sm mt-1 animate-in fade-in slide-in-from-top-1">
-              <div className="mb-4">
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">API Configuration</label>
+            <div className="mt-2 rounded-md border border-white/10 bg-white/[0.02] p-5 text-sm animate-in fade-in slide-in-from-top-1">
+              <div className="mb-3">
+                <label className="mb-4 block text-[10px] font-semibold uppercase tracking-[0.24em] text-white/45">API Configuration</label>
                 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Provider</label>
+                    <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-white/42">Provider</label>
                     <select
                       value={apiProvider}
                       onChange={(e) => {
@@ -214,7 +237,7 @@ export default function Sidebar({ onClose }) {
                         else if (e.target.value === 'gemini') setApiModel('gemini-2.0-flash');
                         else if (e.target.value === 'openrouter') setApiModel('google/gemini-2.0-flash-exp:free');
                       }}
-                      className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50"
+                      className="w-full rounded-md border border-white/12 bg-black px-3 py-3 text-sm text-white outline-none transition-colors focus:border-white/40"
                     >
                       <option value="ollama">Ollama (Local)</option>
                       <option value="openai">OpenAI</option>
@@ -226,19 +249,19 @@ export default function Sidebar({ onClose }) {
                   
                   {apiProvider !== 'ollama' && (
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1">API Key</label>
+                      <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-white/42">API Key</label>
                       <input
                         type="password"
                         placeholder="Enter API Key"
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
-                        className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50 placeholder:text-slate-600"
+                        className="w-full rounded-md border border-white/12 bg-black px-3 py-3 text-sm text-white outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
                       />
                     </div>
                   )}
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1">Model Name</label>
+                    <label className="mb-2 block text-[11px] font-medium uppercase tracking-[0.16em] text-white/42">Model Name</label>
                     <input
                       type="text"
                       placeholder={
@@ -250,13 +273,13 @@ export default function Sidebar({ onClose }) {
                       }
                       value={apiModel}
                       onChange={(e) => setApiModel(e.target.value)}
-                      className="w-full bg-black/40 border border-white/10 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-blue-500/50 placeholder:text-slate-600"
+                      className="w-full rounded-md border border-white/12 bg-black px-3 py-3 text-[13px] font-mono text-white outline-none transition-colors placeholder:text-white/20 focus:border-white/40"
                     />
                   </div>
 
                   <button
                     onClick={handleSaveApiSettings}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg text-xs font-semibold transition-all shadow-md shadow-blue-500/20"
+                    className="mt-1 w-full rounded-md border border-white bg-white py-3 text-sm font-semibold text-black transition-colors hover:bg-white/90"
                   >
                     Save Settings
                   </button>
@@ -265,7 +288,7 @@ export default function Sidebar({ onClose }) {
               
               <button
                 onClick={handleClearChat}
-                className="w-full flex items-center justify-center space-x-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 py-2.5 rounded-lg transition-all text-xs font-semibold border border-red-500/10"
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-white/12 bg-transparent py-3 text-sm font-semibold text-white/72 transition-colors hover:border-white/25 hover:bg-white/5 hover:text-white"
               >
                 <Trash2 size={14} />
                 <span>Clear Conversation</span>
@@ -275,14 +298,14 @@ export default function Sidebar({ onClose }) {
         </div>
       </div>
 
-      <div className="mt-auto px-6 py-8 border-t border-white/[0.05]">
-        <div className="flex items-center space-x-2 mb-2 text-slate-400">
-          <div className="w-5 h-5 rounded-full bg-green-500/10 flex items-center justify-center">
-            <Shield size={12} className="text-green-500" />
+      <div className="mt-auto border-t border-white/10 px-6 py-7">
+        <div className="mb-2 flex items-center gap-2 text-white/65">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full border border-white/12">
+            <Shield size={12} className="text-white/65" />
           </div>
-          <span className="font-bold text-[10px] uppercase tracking-widest">Privacy Secured</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.24em]">Privacy Secured</span>
         </div>
-        <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
+        <p className="text-[11px] leading-6 text-white/38">
           100% local processing - your data never leaves your device
         </p>
       </div>

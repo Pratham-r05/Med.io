@@ -6,9 +6,9 @@
 ![Python](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-## Live demo (if deployed)
+## Live demo 
 
-live link -> medo.prathamraj.dev
+link -> https://medo.prathamraj.dev
 
 ![Medo-AI Demo](f650c04eef1b4bf428e9.png)
 

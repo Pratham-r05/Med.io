@@ -78,6 +78,28 @@ class DocumentProcessor:
             logger.error(f"Error setting up Tesseract: {e}")
             return False
 
+    def _looks_like_readable_document_text(self, text: str) -> bool:
+        """Reject skin photos or unreadable OCR garbage."""
+        if not text:
+            return False
+
+        cleaned = text.strip()
+        if len(cleaned) < 20:
+            return False
+
+        alpha_numeric = re.findall(r'[A-Za-z0-9]', cleaned)
+        words = re.findall(r'[A-Za-z]{2,}|\d+(?:\.\d+)?', cleaned)
+        lines = [line.strip() for line in cleaned.splitlines() if line.strip()]
+
+        if len(alpha_numeric) < 20:
+            return False
+        if len(words) < 5:
+            return False
+        if len(lines) < 2 and len(cleaned) < 60:
+            return False
+
+        return True
+
     def highlight_critical_values(self, text: str) -> str:
         """Highlight critical medical values in text with color coding."""
         try:
@@ -328,6 +350,13 @@ class DocumentProcessor:
                     "success": False,
                     "error": extracted_text if extracted_text else "No text could be extracted",
                     "error_type": "extraction_failed"
+                }
+
+            if file_type.startswith("image/") and not self._looks_like_readable_document_text(extracted_text):
+                return {
+                    "success": False,
+                    "error": "This image does not contain readable report text. Use Image Analysis for wound, skin, or bruise photos.",
+                    "error_type": "not_document_image"
                 }
             
             return {

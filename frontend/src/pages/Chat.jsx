@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { API_URL, DEFAULT_PROVIDER, HOSTED_OLLAMA_MESSAGE, isHostedDeployment } from '../lib/api';
+import { callHostedProviderChat } from '../lib/hosted-provider-chat';
 
 export default function Chat() {
   const [messages, setMessages] = useState([]);
@@ -60,6 +61,22 @@ export default function Chat() {
 
       console.log('🔑 API Config:', { provider, api_key: api_key ? '***set***' : '(empty)', model });
 
+      if (isHostedDeployment && provider !== 'ollama') {
+        const aiContent = await callHostedProviderChat({
+          provider,
+          apiKey: api_key,
+          model,
+          history: historyToSend,
+          userMessage: userMsg.content,
+        });
+
+        const aiMsg = { role: 'assistant', content: aiContent };
+        const updatedMessages = [...newMessages, aiMsg];
+        setMessages(updatedMessages);
+        saveHistory(updatedMessages);
+        return;
+      }
+
       const response = await axios.post(`${API_URL}/chat`, {
         message: userMsg.content,
         history: historyToSend,
@@ -97,7 +114,12 @@ export default function Chat() {
       saveHistory(updatedMessages);
 
     } catch (error) {
-      const errorMsg = { role: 'assistant', content: `❌ Connection error: ${error.message}` };
+      const responseText =
+        error.response?.data?.response ||
+        error.response?.data?.error ||
+        error.response?.data?.detail ||
+        error.message;
+      const errorMsg = { role: 'assistant', content: `❌ ${responseText}` };
       const updatedMessages = [...newMessages, errorMsg];
       setMessages(updatedMessages);
       saveHistory(updatedMessages);

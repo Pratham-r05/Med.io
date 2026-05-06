@@ -26,7 +26,7 @@ export default function Layout() {
       </div>
       
       {/* Main Content */}
-      <div className="relative z-10 flex-1 flex flex-col h-full overflow-hidden bg-transparent">
+      <div className="relative z-10 flex-1 min-h-0 flex flex-col h-full overflow-hidden bg-transparent">
         {/* Top Left Open Button (only visible when sidebar is closed) */}
         {!isSidebarOpen && (
           <button 
@@ -49,7 +49,7 @@ export default function Layout() {
             I'm here to help with your medical questions
           </p>
         </header>
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <Outlet />
         </div>
       </div>

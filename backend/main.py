@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 import requests
@@ -21,6 +22,7 @@ from config import config
 IS_VERCEL = bool(os.getenv("VERCEL"))
 
 app = FastAPI(title="Med.io API")
+FRONTEND_DIST_DIR = Path(__file__).parent.parent / "frontend" / "dist"
 
 # Add CORS middleware
 app.add_middleware(
@@ -198,6 +200,31 @@ def switch_model(request: ModelSwitchRequest):
         return {"success": True, "active_model": chat_service.model}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/")
+def serve_frontend_root():
+    """Serve built frontend index."""
+    index_file = FRONTEND_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Frontend build not found")
+
+
+@app.get("/{full_path:path}")
+def serve_frontend_asset(full_path: str):
+    """Serve built frontend assets and SPA routes."""
+    requested_path = (FRONTEND_DIST_DIR / full_path).resolve()
+    dist_root = FRONTEND_DIST_DIR.resolve()
+
+    if requested_path.exists() and requested_path.is_file() and str(requested_path).startswith(str(dist_root)):
+        return FileResponse(requested_path)
+
+    index_file = FRONTEND_DIST_DIR / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+
+    raise HTTPException(status_code=404, detail="Frontend build not found")
 
 if __name__ == "__main__":
     import uvicorn

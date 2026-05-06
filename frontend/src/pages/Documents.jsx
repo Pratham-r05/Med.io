@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import { API_URL, DEFAULT_PROVIDER, HOSTED_OLLAMA_MESSAGE, isHostedDeployment } from '../lib/api';
+import { callHostedProviderDocumentFromImage } from '../lib/hosted-provider-vision';
 
 export default function Documents() {
   const [file, setFile] = useState(null);
@@ -30,16 +31,17 @@ export default function Documents() {
     const provider = localStorage.getItem('medilens_provider') || DEFAULT_PROVIDER;
     const api_key = localStorage.getItem('medilens_api_key') || '';
     const model = localStorage.getItem('medilens_model') || '';
-
-    if (isHostedDeployment) {
-      setStatus('error');
-      setErrorMsg('Document OCR is disabled on Vercel. Use the local app for reports, or add a cloud OCR service first.');
-      return;
-    }
+    const isImageFile = file.type?.startsWith('image/');
 
     if (provider === 'ollama' && isHostedDeployment) {
       setStatus('error');
       setErrorMsg(HOSTED_OLLAMA_MESSAGE);
+      return;
+    }
+
+    if (isHostedDeployment && !isImageFile) {
+      setStatus('error');
+      setErrorMsg('PDF and OCR report analysis stay local-only on Vercel. Use the local app for reports.');
       return;
     }
 
@@ -48,6 +50,28 @@ export default function Documents() {
     formData.append('model', model);
 
     try {
+      if (isHostedDeployment && isImageFile) {
+        const hostedVision = await callHostedProviderDocumentFromImage({
+          provider,
+          apiKey: api_key,
+          model,
+          file,
+        });
+
+        setStatus('success');
+        setResult({
+          processing: {
+            success: true,
+            extracted_text: hostedVision.extractedText,
+            processing_method: `Hosted vision OCR via ${hostedVision.modelUsed}`,
+          },
+          analysis: {
+            analysis: hostedVision.analysisText,
+          },
+        });
+        return;
+      }
+
       const response = await axios.post(`${API_URL}/analyze_document`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -124,7 +148,7 @@ export default function Documents() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 relative z-10 no-scrollbar">
+    <div className="h-full overflow-y-auto p-8 pb-24 relative z-10 no-scrollbar">
       <div className="max-w-4xl mx-auto space-y-8">
         
         <div className="text-center mb-8">

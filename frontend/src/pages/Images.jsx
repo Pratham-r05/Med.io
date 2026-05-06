@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 import { UploadCloud, Image as ImageIcon, Camera, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-import { API_URL, isHostedDeployment } from '../lib/api';
+import { API_URL, DEFAULT_PROVIDER, HOSTED_OLLAMA_MESSAGE, isHostedDeployment } from '../lib/api';
+import { callHostedProviderVision } from '../lib/hosted-provider-vision';
 
 export default function Images() {
   const [file, setFile] = useState(null);
@@ -68,17 +69,38 @@ export default function Images() {
   const handleUpload = async () => {
     if (!file) return;
 
-    if (isHostedDeployment) {
-      setStatus('error');
-      setErrorMsg('Image triage is disabled on Vercel. Use the local app for Ollama vision analysis.');
-      return;
-    }
-
     setStatus('processing');
     const formData = new FormData();
     formData.append('file', file);
 
+    const provider = localStorage.getItem('medilens_provider') || DEFAULT_PROVIDER;
+    const api_key = localStorage.getItem('medilens_api_key') || '';
+    const model = localStorage.getItem('medilens_model') || '';
+
+    if (provider === 'ollama' && isHostedDeployment) {
+      setStatus('error');
+      setErrorMsg(HOSTED_OLLAMA_MESSAGE);
+      return;
+    }
+
     try {
+      if (isHostedDeployment) {
+        const hostedVision = await callHostedProviderVision({
+          provider,
+          apiKey: api_key,
+          model,
+          file,
+        });
+
+        setStatus('success');
+        setResult({
+          success: true,
+          analysis: hostedVision.text,
+          model_used: hostedVision.modelUsed,
+        });
+        return;
+      }
+
       const response = await axios.post(`${API_URL}/analyze_image`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
@@ -134,7 +156,7 @@ export default function Images() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 relative z-10 no-scrollbar">
+    <div className="h-full overflow-y-auto p-8 pb-24 relative z-10 no-scrollbar">
       <div className="max-w-4xl mx-auto space-y-8">
         
         <div className="text-center mb-8">

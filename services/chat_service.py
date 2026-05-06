@@ -9,6 +9,7 @@ import json
 import time
 import re
 import platform
+import os
 from typing import Dict, List, Any, Optional, Tuple, Generator
 from datetime import datetime
 import logging
@@ -746,6 +747,7 @@ class MedicalChatService:
 
         try:
             logger.info(f"Calling external API: provider={provider}, model={model}")
+            max_tokens = 450 if os.getenv("VERCEL") else config.DEFAULT_MAX_TOKENS
 
             if provider == "anthropic":
                 # Anthropic API format
@@ -767,7 +769,7 @@ class MedicalChatService:
                         
                 payload = {
                     "model": model,
-                    "max_tokens": config.DEFAULT_MAX_TOKENS,
+                    "max_tokens": max_tokens,
                     "temperature": config.CHAT_TEMPERATURE,
                     "system": system_prompt,
                     "messages": anthropic_messages
@@ -794,7 +796,7 @@ class MedicalChatService:
                     "model": model,
                     "messages": messages,
                     "temperature": config.CHAT_TEMPERATURE,
-                    "max_tokens": config.DEFAULT_MAX_TOKENS
+                    "max_tokens": max_tokens
                 }
                 
                 # OpenRouter specific headers
@@ -844,7 +846,7 @@ class MedicalChatService:
                     "contents": gemini_contents,
                     "generationConfig": {
                         "temperature": config.CHAT_TEMPERATURE,
-                        "maxOutputTokens": config.DEFAULT_MAX_TOKENS
+                        "maxOutputTokens": max_tokens
                     }
                 }
                 

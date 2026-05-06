@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd frontend && npm ci && npm run build",
+  "outputDirectory": "frontend/dist",
+  "functions": {
+    "api/*.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{frontend/**,node_modules/**,.git/**,dist/**,build/**,__pycache__/**,**/*.pyc,**/*.pyo,streamlit_to_webui.md,IMPROVEMENTS.md,README.md,app.py,bruise_144303229_1000.jpg,f650c04eef1b4bf428e9.png}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

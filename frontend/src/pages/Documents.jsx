@@ -4,8 +4,7 @@ import { UploadCloud, FileText, Loader2, CheckCircle, AlertCircle } from 'lucide
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL, DEFAULT_PROVIDER, HOSTED_OLLAMA_MESSAGE, isHostedDeployment } from '../lib/api';
 
 export default function Documents() {
   const [file, setFile] = useState(null);
@@ -28,9 +27,21 @@ export default function Documents() {
     const formData = new FormData();
     formData.append('file', file);
 
-    const provider = localStorage.getItem('medilens_provider') || 'ollama';
+    const provider = localStorage.getItem('medilens_provider') || DEFAULT_PROVIDER;
     const api_key = localStorage.getItem('medilens_api_key') || '';
     const model = localStorage.getItem('medilens_model') || '';
+
+    if (isHostedDeployment) {
+      setStatus('error');
+      setErrorMsg('Document OCR is disabled on Vercel. Use the local app for reports, or add a cloud OCR service first.');
+      return;
+    }
+
+    if (provider === 'ollama' && isHostedDeployment) {
+      setStatus('error');
+      setErrorMsg(HOSTED_OLLAMA_MESSAGE);
+      return;
+    }
 
     formData.append('provider', provider);
     formData.append('api_key', api_key);

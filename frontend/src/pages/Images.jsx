@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 import { UploadCloud, Image as ImageIcon, Camera, Loader2, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL, isHostedDeployment } from '../lib/api';
 
 export default function Images() {
   const [file, setFile] = useState(null);
@@ -68,6 +67,12 @@ export default function Images() {
 
   const handleUpload = async () => {
     if (!file) return;
+
+    if (isHostedDeployment) {
+      setStatus('error');
+      setErrorMsg('Image triage is disabled on Vercel. Use the local app for Ollama vision analysis.');
+      return;
+    }
 
     setStatus('processing');
     const formData = new FormData();

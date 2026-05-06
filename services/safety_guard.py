@@ -100,7 +100,7 @@ class SafetyGuard:
             'wrist', 'hand', 'hands', 'finger', 'fingers', 'thumb', 'nail', 'nails',
             'hip', 'hips', 'thigh', 'leg', 'legs', 'knee', 'kneecap', 'shin', 'calf',
             'ankle', 'foot', 'feet', 'toe', 'toes', 'heel', 'sole',
-            'skin', 'muscle', 'muscles', 'joint', 'joints', 'bone', 'bones',
+            'skin', 'scalp', 'hair', 'muscle', 'muscles', 'joint', 'joints', 'bone', 'bones',
             'kidney', 'kidneys', 'liver', 'pancreas', 'bladder', 'genitals',
             
             # Medical terms & procedures
@@ -117,7 +117,7 @@ class SafetyGuard:
             'infection', 'infected', 'disease', 'disorder', 'syndrome', 'condition',
             'pneumonia', 'bronchitis', 'migraine', 'stroke', 'heart disease', 'heart attack',
             'high blood pressure', 'low blood pressure', 'anemia', 'osteoporosis',
-            'fibromyalgia', 'lupus', 'psoriasis', 'eczema', 'dermatitis',
+            'fibromyalgia', 'lupus', 'psoriasis', 'eczema', 'dermatitis', 'alopecia',
             'gastritis', 'ulcer', 'ibs', 'crohns', 'colitis', 'appendicitis',
             
             # General health & wellness
@@ -206,13 +206,15 @@ class SafetyGuard:
             'snake bite', 'animal bite', 'insect bite', 'bee sting', 'spider bite',
             'hurt', 'pain', 'ache', 'sore', 'injured', 'wound', 'cut', 'bruise',
             'fever', 'sick', 'ill', 'not feeling well', 'feeling unwell',
-            'rash', 'swelling', 'bleeding', 'infection', 'burn', 'scratch'
+            'rash', 'swelling', 'bleeding', 'infection', 'burn', 'scratch',
+            'hair loss', 'losing hair', 'falling hair', 'hair fall', 'thinning hair',
+            'balding', 'receding hairline', 'itchy scalp', 'scalp infection'
         ]
         phrase_matches = sum(1 for phrase in medical_phrases if phrase in message_lower)
 
         # 3. Medical context patterns (body parts + action/condition)
-        body_parts = ['head', 'arm', 'leg', 'hand', 'foot', 'chest', 'back', 'neck', 'stomach', 'eye', 'ear']
-        action_words = ['hurt', 'pain', 'ache', 'sore', 'injured', 'swollen', 'bleeding']
+        body_parts = ['head', 'arm', 'leg', 'hand', 'foot', 'chest', 'back', 'neck', 'stomach', 'eye', 'ear', 'hair', 'scalp']
+        action_words = ['hurt', 'pain', 'ache', 'sore', 'injured', 'swollen', 'bleeding', 'falling', 'thinning', 'itching', 'shedding']
         context_matches = 0
         for body in body_parts:
             for action in action_words:
@@ -245,6 +247,18 @@ class SafetyGuard:
                 if any(part in message_lower for part in body_parts + ['health', 'medical', 'doctor']):
                     is_medical = True
                     total_medical_indicators = 1
+
+        if not is_medical:
+            hair_loss_patterns = [
+                r"\blose?ing my hair\b",
+                r"\bhair (loss|fall|falling|thinning)\b",
+                r"\bbald(ing)?\b",
+                r"\breceding hairline\b",
+                r"\balopecia\b",
+            ]
+            if any(re.search(pattern, message_lower) for pattern in hair_loss_patterns):
+                is_medical = True
+                total_medical_indicators = max(total_medical_indicators, 1)
         
         return {
             "is_medical": is_medical,
@@ -294,21 +308,5 @@ class SafetyGuard:
     
     def _get_rejection_message(self) -> str:
         """Get polite rejection message for non-medical queries."""
-        return """I'm MediLens, a medical information assistant, and I can only help with health-related questions. 
-
-**I can help with:**
-- Symptoms and health concerns
-- Understanding medical conditions
-- General wellness questions
-- Lab results interpretation
-- Medication information
-- When to seek medical care
-
-**Please ask about:**
-- Symptoms you're experiencing
-- Medical conditions or treatments
-- Health and wellness topics
-- Medical test results
-
-How can I assist you with a health-related question today?"""
+        return "Please ask a correct medical query."
     

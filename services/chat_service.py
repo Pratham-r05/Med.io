@@ -327,11 +327,14 @@ class MedicalChatService:
             "hey",
             "hey there",
             "hi there",
+            "hello there",
             "good morning",
             "good afternoon",
             "good evening",
         }
-        return clean_msg in greeting_phrases
+        greeting_tokens = {"hi", "hii", "hiii", "hello", "hey", "there", "good", "morning", "afternoon", "evening", "medilens"}
+        words = clean_msg.split()
+        return clean_msg in greeting_phrases or (len(words) <= 4 and all(word in greeting_tokens for word in words))
 
     def _is_medical_query(self, message: str) -> bool:
         """Check if the query is medical/health-related using enhanced SafetyGuard."""
@@ -796,7 +799,10 @@ class MedicalChatService:
                 
                 # OpenRouter specific headers
                 if provider == "openrouter":
-                    headers["HTTP-Referer"] = "http://localhost:8000"
+                    referer = os.getenv("APP_BASE_URL") or os.getenv("VERCEL_PROJECT_PRODUCTION_URL") or os.getenv("VERCEL_URL") or "http://localhost:8000"
+                    if not referer.startswith("http"):
+                        referer = f"https://{referer}"
+                    headers["HTTP-Referer"] = referer
                     headers["X-Title"] = "Med.io"
                     
                 response = requests.post(url, headers=headers, json=payload, timeout=config.OLLAMA_TIMEOUT)

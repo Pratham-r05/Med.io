@@ -18,6 +18,8 @@ from services.vision_service import VisionAnalyzer
 from services.ollama_manager import ollama_manager
 from config import config
 
+IS_VERCEL = bool(os.getenv("VERCEL"))
+
 app = FastAPI(title="Med.io API")
 
 # Add CORS middleware
@@ -45,9 +47,18 @@ class ChatRequest(BaseModel):
 class ModelSwitchRequest(BaseModel):
     model: str
 
-@app.get("/status")
+@app.get("/api/status")
 def get_status():
     """Check if Ollama is running and return system status."""
+    if IS_VERCEL:
+        return {
+            "online": False,
+            "models": [],
+            "active_model": "",
+            "deployment_target": "vercel",
+            "local_provider_supported": False,
+            "message": "Hosted deployment detected. Use a cloud provider in Settings."
+        }
     try:
         response = requests.get(f"{config.OLLAMA_BASE_URL}/api/tags", timeout=5)
         online = response.status_code == 200
@@ -64,7 +75,7 @@ def get_status():
             "active_model": chat_service.model
         }
 
-@app.get("/models")
+@app.get("/api/models")
 def get_models():
     """Get list of available models from Ollama."""
     try:
@@ -75,13 +86,20 @@ def get_models():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/chat")
+@app.post("/api/chat")
 async def chat(request: ChatRequest):
     """Handle medical chat requests."""
     try:
         print(f"📨 /chat received: provider={request.provider}, model={request.model}, api_key={'***set***' if request.api_key else '(empty)'}")
         
         # Test connection first (only for Ollama)
+        if request.provider == "ollama" and IS_VERCEL:
+            return {
+                "success": False,
+                "response": "Ollama local mode is unavailable on Vercel. Open Settings and choose OpenAI, Anthropic, Gemini, or OpenRouter.",
+                "error_type": "provider_unavailable"
+            }
+
         if request.provider == "ollama":
             connected, _ = chat_service.test_connection()
             if not connected:
@@ -109,7 +127,7 @@ async def chat(request: ChatRequest):
         traceback.print_exc()
         return {"success": False, "response": f"❌ Error: {str(e)}", "error_type": "server_error"}
 
-@app.post("/analyze_document")
+@app.post("/api/analyze_document")
 async def analyze_document(
     file: UploadFile = File(...),
     provider: str = Form("ollama"),
@@ -118,6 +136,13 @@ async def analyze_document(
 ):
     """Handle document uploads and medical analysis."""
     try:
+        if IS_VERCEL:
+            return {
+                "success": False,
+                "error": "Document OCR is disabled on Vercel because the Tesseract system binary is unavailable there.",
+                "error_type": "feature_unavailable"
+            }
+
         file_bytes = await file.read()
         file_type = file.content_type
         filename = file.filename
@@ -144,10 +169,17 @@ async def analyze_document(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/analyze_image")
+@app.post("/api/analyze_image")
 async def analyze_image(file: UploadFile = File(...)):
     """Handle image uploads and vision analysis."""
     try:
+        if IS_VERCEL:
+            return {
+                "success": False,
+                "error": "Image triage is disabled on Vercel because this build does not have local Ollama vision support.",
+                "error_type": "feature_unavailable"
+            }
+
         file_bytes = await file.read()
         filename = file.filename
 
@@ -157,7 +189,7 @@ async def analyze_image(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/switch_model")
+@app.post("/api/switch_model")
 def switch_model(request: ModelSwitchRequest):
     """Switch the active LLM model."""
     try:

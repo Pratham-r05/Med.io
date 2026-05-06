@@ -76,3 +76,4 @@ Thumbs.db
 *.test
 test_*
 debug_*
+.vercel

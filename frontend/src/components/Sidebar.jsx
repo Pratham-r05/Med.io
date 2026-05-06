@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
+import {
   MessageSquare, 
   FileText, 
   Image as ImageIcon, 
@@ -13,8 +13,7 @@ import {
   ChevronRight,
   PanelLeftClose
 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { API_URL, DEFAULT_PROVIDER, HOSTED_OLLAMA_MESSAGE, isHostedDeployment } from '../lib/api';
 
 export default function Sidebar({ onClose }) {
   const [status, setStatus] = useState({ online: false, models: [], active_model: '' });
@@ -23,7 +22,7 @@ export default function Sidebar({ onClose }) {
   const [searchQuery, setSearchQuery] = useState('');
   
   // API Configuration State
-  const [apiProvider, setApiProvider] = useState(localStorage.getItem('medilens_provider') || 'ollama');
+  const [apiProvider, setApiProvider] = useState(localStorage.getItem('medilens_provider') || DEFAULT_PROVIDER);
   const [apiKey, setApiKey] = useState(localStorage.getItem('medilens_api_key') || '');
   const [apiModel, setApiModel] = useState(localStorage.getItem('medilens_model') || '');
 
@@ -50,7 +49,7 @@ export default function Sidebar({ onClose }) {
 
   useEffect(() => {
     const syncApiSettings = () => {
-      setApiProvider(localStorage.getItem('medilens_provider') || 'ollama');
+      setApiProvider(localStorage.getItem('medilens_provider') || DEFAULT_PROVIDER);
       setApiKey(localStorage.getItem('medilens_api_key') || '');
       setApiModel(localStorage.getItem('medilens_model') || '');
     };
@@ -283,6 +282,12 @@ export default function Sidebar({ onClose }) {
                   >
                     Save Settings
                   </button>
+
+                  {isHostedDeployment && apiProvider === 'ollama' && (
+                    <p className="text-xs leading-5 text-amber-300/85">
+                      {HOSTED_OLLAMA_MESSAGE}
+                    </p>
+                  )}
                 </div>
               </div>
               
@@ -306,7 +311,7 @@ export default function Sidebar({ onClose }) {
           <span className="text-[10px] font-semibold uppercase tracking-[0.24em]">Privacy Secured</span>
         </div>
         <p className="text-[11px] leading-6 text-white/38">
-          100% local processing - your data never leaves your device
+          {isHostedDeployment ? 'Hosted on Vercel. Use your own provider key in Settings.' : '100% local processing - your data never leaves your device'}
         </p>
       </div>
     </div>

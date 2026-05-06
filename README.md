@@ -10,7 +10,7 @@
 
 link -> https://medo.prathamraj.dev
 
-![Medo-AI Demo](f650c04eef1b4bf428e9.png)
+![Medo-AI Demo](Medo-AI.png)
 
 ---
 

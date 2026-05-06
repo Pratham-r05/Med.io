@@ -97,7 +97,7 @@ export default function Sidebar({ onClose }) {
       <div className="border-b border-white/10 px-6 py-6">
         <div className="pr-12">
           <h1 className="mb-2 text-[2.1rem] font-semibold tracking-[-0.04em] text-white">
-            <span className="font-serif italic font-normal text-white/92">Med</span>
+            <span className="font-serif italic font-normal text-white/92">medo</span>
             <span className="mx-0.5 font-light text-white/45">.</span>
             <span className="font-sans font-semibold tracking-[-0.06em] text-white">io</span>
           </h1>

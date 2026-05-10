@@ -6,7 +6,6 @@ Complete medical AI system with chat, document analysis, and image triage
 
 import streamlit as st
 import requests
-import json
 import os
 import threading
 import time
@@ -50,6 +49,7 @@ st.set_page_config(
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded"
+
 )
 
 def initialize_session_state():
